@@ -46,6 +46,7 @@
 #include "urdf/model.h"
 
 #include "rclcpp/rclcpp.hpp"
+#include "rcutils/cmdline_parser.h"
 
 #include "robot_state_publisher/joint_state_listener.h"
 #include "robot_state_publisher/robot_state_publisher.h"
@@ -180,23 +181,51 @@ bool read_urdf_xml(const std::string & filename, std::string & xml_string)
   }
 }
 
+void print_usage()
+{
+  printf("Usage for robot_state_publisher:\n");
+  printf("robot_state_publisher [-f urdf_filename] [-h]\n");
+  printf("options:\n");
+  printf("-h : Print this help function.\n");
+  printf("-f urdf_filename : Specify a urdf file. \n");
+}
+
 // ----------------------------------
 // ----- MAIN -----------------------
 // ----------------------------------
 int main(int argc, char ** argv)
 {
+  // Force flush of the stdout buffer.
+  setvbuf(stdout, NULL, _IONBF, BUFSIZ);
+
+  if (rcutils_cli_option_exist(argv, argv + argc, "-h"))
+  {
+    print_usage();
+    return -1;
+  }
+
   // Initialize ros
   rclcpp::init(argc, argv);
 
-  // gets the location of the robot description on the parameter server
-  if (argc < 2) {
-    fprintf(stderr, "Robot State Publisher 2 requires a urdf file name\n");
+  // Parse the command line options.
+  std::string urdf_filename;
+  char * cli_option = rcutils_cli_get_option(argv, argv + argc, "-f");
+  if (cli_option != nullptr)
+  {
+    urdf_filename = std::string(cli_option);
+  }
+  else
+  {
+    fprintf(stderr, "Robot State Publisher 2 requires a urdf file name\n\n");
+    print_usage();
     return -1;
   }
-  fprintf(stderr, "Initialize urdf model from file: %s\n", argv[1]);
+
+  fprintf(stderr, "Initializing urdf model from file: %s\n", urdf_filename.c_str());
   urdf::Model model;
-  if (!model.initFile(argv[1])) {
-    fprintf(stderr, "Unable to initialize urdf::model from %s\n", argv[1]);
+
+  if (!model.initFile(urdf_filename)) {
+    fprintf(stderr, "Unable to initialize urdf::model from %s\n", urdf_filename.c_str());
     return -1;
   }
 
@@ -220,8 +249,8 @@ int main(int argc, char ** argv)
 
   // Read the URDF XML data (this should always succeed)
   std::string urdf_xml;
-  if (!read_urdf_xml(argv[1], urdf_xml)) {
-    fprintf(stderr, "failed to read urdf xml '%s'\n", argv[1]);
+  if (!read_urdf_xml(urdf_filename, urdf_xml)) {
+    fprintf(stderr, "failed to read urdf xml '%s'\n", urdf_filename.c_str());
     return -1;
   }
 
